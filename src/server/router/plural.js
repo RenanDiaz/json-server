@@ -116,7 +116,7 @@ module.exports = (db, name, opts) => {
         // Always use an array, in case req.query is an array
         const arr = [].concat(req.query[key])
 
-        chain = chain.filter(element => {
+        chain = chain.deepFilter(element => {
           return arr
             .map(function(value) {
               const isDifferent = /_ne$/.test(key)
