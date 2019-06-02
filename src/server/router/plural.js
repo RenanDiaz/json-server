@@ -84,7 +84,8 @@ module.exports = (db, name, opts) => {
           /_lte$/.test(query) ||
           /_gte$/.test(query) ||
           /_ne$/.test(query) ||
-          /_like$/.test(query)
+          /_like$/.test(query) ||
+          (/.*\..*/.test(query) && _.has(arr[i], query.split('.')[0]))
         )
           return
       }
@@ -116,19 +117,22 @@ module.exports = (db, name, opts) => {
         // Always use an array, in case req.query is an array
         const arr = [].concat(req.query[key])
 
-        chain = chain.deepFilter(element => {
+        chain = chain.filter(element => {
           return arr
             .map(function(value) {
               const isDifferent = /_ne$/.test(key)
               const isRange = /_lte$/.test(key) || /_gte$/.test(key)
               const isLike = /_like$/.test(key)
               const path = key.replace(/(_lte|_gte|_ne|_like)$/, '')
+              const isDeepFilter = /.*\..*/.test(key)
               // get item value based on path
               // i.e post.title -> 'foo'
               const elementValue = _.get(element, path)
 
               // Prevent toString() failing on undefined or null values
-              if (elementValue === undefined || elementValue === null) {
+              const isUndefinedOrNull =
+                elementValue === undefined || elementValue === null
+              if (!isDeepFilter && isUndefinedOrNull) {
                 return
               }
 
@@ -142,6 +146,16 @@ module.exports = (db, name, opts) => {
                 return value !== elementValue.toString()
               } else if (isLike) {
                 return new RegExp(value, 'i').test(elementValue.toString())
+              } else if (isDeepFilter && isUndefinedOrNull) {
+                const split = key.split('.')
+                const subPath = split[0]
+                const subKey = split[1]
+                const subArr = _.get(element, subPath)
+                if (!Array.isArray(subArr)) return
+                const result = subArr.filter(subElementValue => {
+                  return value === subElementValue[subKey].toString()
+                })
+                return result.length > 0
               } else {
                 return value === elementValue.toString()
               }
